@@ -245,6 +245,29 @@ def dump(
     keep_temp: Annotated[
         bool, typer.Option("--keep-temp", help="Keep local and remote temp files.")
     ] = False,
+    rootless: Annotated[
+        bool,
+        typer.Option(
+            "--rootless",
+            help=(
+                "Stage the on-device dump inside the target app's sandbox container "
+                "instead of the global temp root. Use on rootless jailbreaks where "
+                "the injected agent cannot write to /tmp (dump fails with "
+                "'Operation not permitted')."
+            ),
+        ),
+    ] = False,
+    rootless_temp: Annotated[
+        str | None,
+        typer.Option(
+            "--rootless-temp",
+            help=(
+                "Explicit on-device staging root for --rootless, used when the app "
+                "sandbox container cannot be resolved automatically. Point it at a "
+                "path the target app can write, e.g. its Data container tmp dir."
+            ),
+        ),
+    ] = None,
     verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
     json_log: Annotated[bool, typer.Option("--json-log", help="Emit logs as JSON lines.")] = False,
     trace: Annotated[
@@ -268,6 +291,8 @@ def dump(
         timeout=timeout,
         retry=retry,
         keep_temp=keep_temp,
+        rootless=rootless,
+        rootless_temp=rootless_temp,
     )
     try:
         with build_progress() as progress:

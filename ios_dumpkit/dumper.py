@@ -27,6 +27,45 @@ from .verifier import VerificationResult, verify_ipa
 
 log = get_logger(__name__)
 
+# Basename reused for the on-device staging directory, mirroring DEFAULT_REMOTE_TEMP.
+ROOTLESS_STAGING_DIRNAME = "ios-dumpkit-ng"
+
+
+def build_remote_job_dir(
+    options: DumpOptions,
+    identifier: str,
+    data_container: str | None,
+) -> str:
+    """Build the on-device directory the agent writes decrypted modules into.
+
+    On rootless jailbreaks the Frida agent runs inside the target app's sandbox
+    and cannot write to a global temp root such as ``/tmp`` (the write fails with
+    ``Operation not permitted``). When ``options.rootless`` is set, stage the dump
+    inside a sandbox-writable location instead:
+
+    * ``options.rootless_temp`` when given -- an explicit staging root the user
+      knows the app can write (e.g. ``<data-container>/tmp``); or
+    * the app's own Data container (``<container>/tmp``), resolved automatically
+      from the agent's reported sandbox ``HOME``.
+
+    Either way the SSH user can still read the result back for transfer.
+    """
+
+    job = uuid.uuid4().hex
+    if options.rootless:
+        if options.rootless_temp:
+            return posixpath.join(options.rootless_temp, ROOTLESS_STAGING_DIRNAME, identifier, job)
+        if not data_container:
+            raise DumpKitError(
+                "Rootless dump requested but the app sandbox container could not be "
+                "resolved from the agent (its sandbox HOME was empty). Pass "
+                "--rootless-temp with a path the target app can write, e.g. its "
+                "Data container tmp dir "
+                "(/var/mobile/Containers/Data/Application/<UUID>/tmp), then retry."
+            )
+        return posixpath.join(data_container, "tmp", ROOTLESS_STAGING_DIRNAME, identifier, job)
+    return posixpath.join(options.remote_temp, identifier, job)
+
 
 @dataclass(slots=True)
 class DumpSummary:
@@ -103,6 +142,10 @@ class IOSDumper:
                 modules = self.frida_client.modules_from_payload(raw_modules)
                 selected = self._select_modules(modules, bundle, options)
                 log.info("encrypted module candidates: %d", len(selected))
+
+            remote_job_dir = build_remote_job_dir(options, app.identifier, bundle.data_container)
+            if options.rootless:
+                log.info("rootless mode: staging dump inside app container %s", remote_job_dir)
 
             local_bundle = temp_root / bundle.app_name
             if not local_bundle.name.endswith(".app"):

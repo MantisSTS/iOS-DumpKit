@@ -236,6 +236,8 @@ Common flags:
 --timeout <seconds>
 --retry <count>
 --keep-temp
+--rootless
+--rootless-temp <path>
 --verbose
 --json-log
 --trace <path>
@@ -367,6 +369,31 @@ The doctor checks common jailbreak layout hints:
 - classic rootful paths
 
 This should work with many Dopamine, palera1n, and checkra1n-style layouts, but device-specific jailbreak changes can still require investigation with `--trace`.
+
+### `--rootless` staging
+
+On rootless jailbreaks the injected Frida agent runs inside the target app's sandbox and cannot write decrypted modules to the global temp root (`/tmp/ios-dumpkit-ng`). The dump then fails at the `dumping binary` stage with `Operation not permitted`, even though `copying bundle` succeeded (bundle copy is pulled over SFTP, not written from inside the sandbox).
+
+Pass `--rootless` to stage the on-device dump inside the app's own Data container (`<container>/tmp/ios-dumpkit-ng/...`), which the sandboxed process can write and the SSH user can still read back:
+
+```bash
+ios-dumpkit dump com.example.app \
+  --usb \
+  --ssh-host 127.0.0.1 --ssh-port 2222 --ssh-user mobile --ssh-pass '<password>' \
+  --rootless \
+  --output-dir ./dumps
+```
+
+The container path is resolved automatically from the app's sandbox `HOME` (via a POSIX `getenv` call in the agent, so it works even when the Objective-C runtime is unavailable in-process); no manual UUID lookup is needed.
+
+If auto-resolution still fails on an unusual setup, pass an explicit staging root the app can write:
+
+```bash
+ios-dumpkit dump com.example.app --usb \
+  --ssh-host 127.0.0.1 --ssh-port 2222 --ssh-user mobile --ssh-pass '<password>' \
+  --rootless \
+  --rootless-temp /var/mobile/Containers/Data/Application/<UUID>/tmp
+```
 
 ## Troubleshooting
 

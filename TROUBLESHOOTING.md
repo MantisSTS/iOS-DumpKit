@@ -89,6 +89,18 @@ If cryptid is still non-zero, inspect `--trace` output for module dump failures 
 
 The IPA must contain `Payload/AppName.app`. Rebuild with `ios-dumpkit dump ... --output-dir ./dumps` and verify with `ios-dumpkit verify`.
 
+## "Operation not permitted" During dumping binary
+
+If `copying bundle` completes but `dumping binary` fails with `Operation not permitted` (raised from `copyFileSlice` in the agent), the injected agent cannot write the decrypted module to the global temp root. On rootless jailbreaks the agent runs inside the target app's sandbox, so writes to `/tmp` are denied. This is unrelated to the SSH user (`root` vs `mobile`): bundle copy is an SFTP pull, while the binary dump is the first write made from inside the sandbox.
+
+Re-run with `--rootless`, which stages the dump inside the app's own Data container instead:
+
+```bash
+ios-dumpkit dump com.example.app --usb \
+  --ssh-host 127.0.0.1 --ssh-port 2222 --ssh-user mobile --ssh-pass '<password>' \
+  --rootless
+```
+
 ## Rootless Filesystem Path Problems
 
 Do not assume `/Applications`. Use `ios-dumpkit list` and `doctor`; the dumper resolves bundle paths through Frida and checks common rootless locations such as `/var/jb` and `/private/preboot`.

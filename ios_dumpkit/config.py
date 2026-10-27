@@ -60,6 +60,8 @@ class DumpOptions:
     retry: int = 1
     keep_temp: bool = False
     remote_temp: str = DEFAULT_REMOTE_TEMP
+    rootless: bool = False
+    rootless_temp: str | None = None
 
 
 @dataclass(slots=True)

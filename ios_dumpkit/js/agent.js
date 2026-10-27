@@ -123,6 +123,20 @@ function getBundleInfo() {
     info.bundlePath = fallback.path.substring(0, fallback.path.indexOf('.app/') + 4);
   }
 
+  // Resolve the sandbox Data container (HOME) without requiring the ObjC
+  // runtime, which is not always available in-process. This is what --rootless
+  // staging relies on, so it must work even when the ObjC branch below is skipped.
+  try {
+    var getenv = native('getenv', 'pointer', ['pointer']);
+    var homePtr = getenv(allocStr('HOME'));
+    if (homePtr && !homePtr.isNull()) {
+      var home = homePtr.readUtf8String();
+      if (home) {
+        info.dataContainer = home;
+      }
+    }
+  } catch (_) {}
+
   if (!tryLoadObjC()) {
     return info;
   }
